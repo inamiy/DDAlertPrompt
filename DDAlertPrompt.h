@@ -28,16 +28,29 @@
 #import <UIKit/UIKit.h>
 
 
-@interface DDAlertPrompt : UIAlertView <UITableViewDelegate, UITableViewDataSource> {
+typedef enum {
+    DDAlertPromptTypePlain,
+    DDAlertPromptTypePlainAndSecret
+} DDAlertPromptType;
+
+
+@interface DDAlertPrompt : UIAlertView <UITableViewDelegate, UITableViewDataSource, UITextFieldDelegate> {
+    
+    DDAlertPromptType promptType_;
+    
 	@private
 	UITableView *tableView_;
 	UITextField *plainTextField_;
 	UITextField *secretTextField_;
 }
 
+@property(nonatomic, assign, readonly) DDAlertPromptType promptType;
+
 @property(nonatomic, retain, readonly) UITextField *plainTextField;
 @property(nonatomic, retain, readonly) UITextField *secretTextField;
 
-- (id)initWithTitle:(NSString *)title delegate:(id /*<UIAlertViewDelegate>*/)delegate cancelButtonTitle:(NSString *)cancelButtonTitle otherButtonTitle:(NSString *)otherButtonTitles;
+- (id)initWithTitle:(NSString *)title delegate:(id /*<UIAlertViewDelegate>*/)delegate cancelButtonTitle:(NSString *)cancelButtonTitle otherButtonTitle:(NSString *)otherButtonTitle;
+
+- (id)initWithTitle:(NSString *)title delegate:(id /*<UIAlertViewDelegate>*/)delegate cancelButtonTitle:(NSString *)cancelButtonTitle otherButtonTitle:(NSString *)otherButtonTitle promptType:(DDAlertPromptType)promptType;
 
 @end

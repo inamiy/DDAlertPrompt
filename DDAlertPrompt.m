@@ -38,6 +38,8 @@
 
 @implementation DDAlertPrompt
 
+@synthesize promptType = promptType_;
+
 @synthesize tableView = tableView_;
 @synthesize plainTextField = plainTextField_;
 @synthesize secretTextField = secretTextField_;
@@ -50,8 +52,24 @@
 */
 
 - (id)initWithTitle:(NSString *)title delegate:(id /*<UIAlertViewDelegate>*/)delegate cancelButtonTitle:(NSString *)cancelButtonTitle otherButtonTitle:(NSString *)otherButtonTitles {
+    
+    return [self initWithTitle:title delegate:delegate cancelButtonTitle:cancelButtonTitle otherButtonTitle:otherButtonTitles promptType:DDAlertPromptTypePlain];
+}
 
-	if ((self = [super initWithTitle:title message:@"\n\n\n" delegate:delegate cancelButtonTitle:cancelButtonTitle otherButtonTitles:otherButtonTitles, nil])) {
+- (id)initWithTitle:(NSString *)title delegate:(id /*<UIAlertViewDelegate>*/)delegate cancelButtonTitle:(NSString *)cancelButtonTitle otherButtonTitle:(NSString *)otherButtonTitle promptType:(DDAlertPromptType)promptType {
+
+    NSString* spacer;
+    if (promptType == DDAlertPromptTypePlain) {
+        spacer = @"\n\n";
+    }
+    else {
+        spacer = @"\n\n\n";
+    }
+    
+	if ((self = [super initWithTitle:title message:spacer delegate:delegate cancelButtonTitle:cancelButtonTitle otherButtonTitles:otherButtonTitle, nil])) {
+        
+        promptType_ = promptType;
+        
 		// FIXME: This is a workaround. By uncomment below, UITextFields in tableview will show characters when typing (possible keyboard reponder issue).
 		[self addSubview:self.plainTextField];
 
@@ -75,10 +93,29 @@
 	[[NSNotificationCenter defaultCenter] removeObserver:self name:UIDeviceOrientationDidChangeNotification object:nil];
 	[[UIDevice currentDevice] endGeneratingDeviceOrientationNotifications];
 	
+    plainTextField_.delegate = nil;
+    secretTextField_.delegate = nil;
+    
+    [plainTextField_ release];
+    [secretTextField_ release]; 
+    
 	[tableView_ setDataSource:nil];
 	[tableView_ setDelegate:nil];
 	[tableView_ release];
     [super dealloc];
+}
+
+- (void)show {
+    [super show];
+    
+    // Not a good place to call (awkward animation).
+    // It's better to call from delegate's didPresentAlertView:.
+    //[self performSelector:@selector(didShow) withObject:nil afterDelay:0.4];
+}
+
+- (void)didShow {
+    [self.plainTextField becomeFirstResponder];
+    [self setNeedsLayout];
 }
 
 #pragma mark layout
@@ -86,13 +123,35 @@
 - (void)layoutSubviews {
 	// We assume keyboard is on.
 	if ([[UIDevice currentDevice] isGeneratingDeviceOrientationNotifications]) {
-		if (UIInterfaceOrientationIsPortrait([[UIApplication sharedApplication] statusBarOrientation])) {
-			self.center = CGPointMake(160.0f, (460.0f - 216.0f)/2 + 12.0f);
-			self.tableView.frame = CGRectMake(12.0f, 51.0f, 260.0f, 56.0f);		
-		} else {
-			self.center = CGPointMake(240.0f, (300.0f - 162.0f)/2 + 12.0f);
-			self.tableView.frame = CGRectMake(12.0f, 35.0f, 260.0f, 56.0f);		
-		}
+        
+        CGFloat totalHeight = (promptType_ == DDAlertPromptTypePlain ? 28.0 : 56.0);
+        
+        if (UI_USER_INTERFACE_IDIOM() == UIUserInterfaceIdiomPad) {
+            if (UIInterfaceOrientationIsPortrait([[UIApplication sharedApplication] statusBarOrientation])) {
+                self.center = CGPointMake(self.window.bounds.size.width/2.0, 
+                                          ((self.window.bounds.size.height-20) - 264.0f)/2 + 12.0f);
+                self.tableView.frame = CGRectMake(12.0f, 51.0f, 260.0f, totalHeight);
+            }
+            else {
+                
+                // NOTE: 
+                // weird layout on iOS4.3 iPad-simulator-landscape
+                // due to FIXME problem, but not for device.
+                self.center = CGPointMake(self.window.bounds.size.width/2.0, 
+                                          ((self.window.bounds.size.height-20) - 352)/2 + 12.0f);
+                self.tableView.frame = CGRectMake(12.0f, 35.0f+16.0, 260.0f, totalHeight);
+            }
+        }
+        else {
+            if (UIInterfaceOrientationIsPortrait([[UIApplication sharedApplication] statusBarOrientation])) {
+                self.center = CGPointMake(160.0f, (460.0f - 216.0f)/2 + 12.0f);
+                self.tableView.frame = CGRectMake(12.0f, 51.0f, 260.0f, totalHeight);		
+            } else {
+                self.center = CGPointMake(240.0f, (300.0f - 162.0f)/2 + 12.0f);
+                self.tableView.frame = CGRectMake(12.0f, 35.0f, 260.0f, totalHeight);		
+            }
+        }
+        
 	}
 }
 
@@ -106,6 +165,7 @@
 
 	if (!plainTextField_) {
 		plainTextField_ = [[UITextField alloc] initWithFrame:CGRectMake(5.0f, 0.0f, 255.0f, 28.0f)];
+        plainTextField_.delegate = self;
 		plainTextField_.contentVerticalAlignment = UIControlContentVerticalAlignmentCenter;
 		plainTextField_.clearButtonMode = UITextFieldViewModeWhileEditing;
 		plainTextField_.placeholder = @"Nickname or Email";
@@ -115,8 +175,11 @@
 
 - (UITextField *)secretTextField {
 	
+	if (promptType_ == DDAlertPromptTypePlain) return nil;
+    
 	if (!secretTextField_) {
 		secretTextField_ = [[UITextField alloc] initWithFrame:CGRectMake(5.0f, 0.0f, 255.0f, 28.0f)];
+        secretTextField_.delegate = self;
 		secretTextField_.contentVerticalAlignment = UIControlContentVerticalAlignmentCenter;
 		secretTextField_.secureTextEntry = YES;
 		secretTextField_.clearButtonMode = UITextFieldViewModeWhileEditing;
@@ -132,7 +195,7 @@
 }
 
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
-	return 2;
+    return (promptType_ == DDAlertPromptTypePlain ? 1 : 2);
 }
 
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
@@ -142,10 +205,9 @@
     UITableViewCell *cell = (UITableViewCell *)[tableView dequeueReusableCellWithIdentifier:AlertPromptCellIdentifier];
     if (cell == nil) {
         cell = [[[UITableViewCell alloc] initWithStyle:UITableViewCellStyleSubtitle reuseIdentifier:AlertPromptCellIdentifier] autorelease];
-    }
-	
-	if (![cell.contentView.subviews count]) {
-		if (indexPath.row) {
+        cell.selectionStyle = UITableViewCellSelectionStyleNone;
+        
+        if (indexPath.row && promptType_ == DDAlertPromptTypePlainAndSecret) {
 			[cell.contentView addSubview:self.secretTextField];			
 		} else {
 			[cell.contentView addSubview:self.plainTextField];
@@ -160,6 +222,24 @@
 
 - (UITableViewCellEditingStyle)tableView:(UITableView *)tableView editingStyleForRowAtIndexPath:(NSIndexPath *)indexPath {
     return UITableViewCellEditingStyleNone;
+}
+
+#pragma mark UITextFieldDelegate
+
+- (BOOL)textFieldShouldReturn:(UITextField *)textField
+{
+    if (textField == self.plainTextField) {
+        if (promptType_ == DDAlertPromptTypePlain) {
+            [self dismissWithClickedButtonIndex:1 animated:YES];
+        }
+        else {
+            [self.secretTextField becomeFirstResponder];
+        }
+    } 
+    else if (textField == self.secretTextField) {
+        [self dismissWithClickedButtonIndex:1 animated:YES];
+    }
+    return YES;
 }
 
 @end
